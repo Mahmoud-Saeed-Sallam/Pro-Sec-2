@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Programming and AI - Sec Two</title>
+
+    <!-- Google Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&family=Orbitron:wght@500;700;900&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Link to external CSS -->
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- Animated Background -->
+    <canvas id="spaceCanvas"></canvas>
+
+    <!-- Header Section with 3D Logos -->
+    <header>
+      <!-- Logo Left (Programming) -->
+      <div class="logo-wrapper logo-left">
+        <img src="logopr.png" alt="Programming Logo" />
+        <div class="sphere-overlay"></div>
+      </div>
+
+      <!-- Logo Right (KLS) -->
+      <div class="logo-wrapper logo-right">
+        <img src="kls.png" alt="KLS Logo" />
+        <div class="sphere-overlay"></div>
+      </div>
+
+      <h1 class="glitch-text">Programming and AI --- Part One</h1>
+      <div class="subtitle">for Secondary Two &bull; 2026 - 2027</div>
+      <div class="creator">
+        Created by
+        <h4 class="glitch-text1" sty>Mr. Mahmod Saeed</h4>
+
+      <div class="school">مدارس الخليل لغات</div>
+    </header>
+
+    <!-- Units Grid (Single Row) -->
+    <div class="container">
+      <!-- Unit 1 -->
+      <div class="unit-folder" onclick="toggleFolder(this)">
+        <div class="unit-title">
+          Unit One <span class="arrow">&#9660;</span>
+        </div>
+        <div class="unit-name">Information Technology & Society</div>
+        <div class="lessons-list">
+          <a
+            href="U 1 - Lesson 1.html"
+            class="lesson-card"
+            onclick="navigateLesson(event)"
+          >
+            <span class="lesson-number">1-1</span>
+            <span class="lesson-text">Development of IT</span>
+          </a>
+          <a
+            href="U 1 - Lesson 2.html"
+            class="lesson-card"
+            onclick="navigateLesson(event)"
+          >
+            <span class="lesson-number">1-2</span>
+            <span class="lesson-text">How AI Works</span>
+          </a>
+          <a
+            href="U 1 - Lesson 3.html"
+            class="lesson-card"
+            onclick="navigateLesson(event)"
+          >
+            <span class="lesson-number">1-3</span>
+            <span class="lesson-text">AI in Daily Life and Industry</span>
+          </a>
+          <a
+            href="U 1 - Lesson 4.html"
+            class="lesson-card"
+            onclick="navigateLesson(event)"
+          >
+            <span class="lesson-number">1-4</span>
+            <span class="lesson-text">Ethical Issues with AI</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Unit 2 -->
+      <div class="unit-folder" onclick="toggleFolder(this)">
+        <div class="unit-title">
+          Unit Two <span class="arrow">&#9660;</span>
+        </div>
+        <div class="unit-name">Cybersecurity</div>
+        <div class="lessons-list">
+          <a
+            href="U 2 - Lesson 1.html"
+            class="lesson-card"
+            onclick="navigateLesson(event)"
+          >
+            <span class="lesson-number">2-1</span>
+            <span class="lesson-text">Cryptographic Tech</span>
+          </a>
+          <a
+            href="U 2 - Lesson 2.html"
+            class="lesson-card"
+            onclick="navigateLesson(event)"
+          >
+            <span class="lesson-number">2-2</span>
+            <span class="lesson-text">Network Security Design</span>
+          </a>
+          <a
+            href="U 2 - Lesson 3.html"
+            class="lesson-card"
+            onclick="navigateLesson(event)"
+          >
+            <span class="lesson-number">2-3</span>
+            <span class="lesson-text">Incident Response & Risk</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Unit 3 -->
+      <div class="unit-folder" onclick="toggleFolder(this)">
+        <div class="unit-title">
+          Unit Three <span class="arrow">&#9660;</span>
+        </div>
+        <div class="unit-name">Web Applications</div>
+        <div class="lessons-list">
+          <a
+            href="U 3 - Lesson 1.html"
+            class="lesson-card"
+            onclick="navigateLesson(event)"
+          >
+            <span class="lesson-number">3-1</span>
+            <span class="lesson-text">Overall Structure</span>
+          </a>
+          <a
+            href="U 3 - Lesson 2.html"
+            class="lesson-card"
+            onclick="navigateLesson(event)"
+          >
+            <span class="lesson-number">3-2</span>
+            <span class="lesson-text">Communication Methods</span>
+          </a>
+          <a
+            href="U 3 - Lesson 3.html"
+            class="lesson-card"
+            onclick="navigateLesson(event)"
+          >
+            <span class="lesson-number">3-3</span>
+            <span class="lesson-text">Frontend Technology</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Unit 4 -->
+      <div class="unit-folder" onclick="toggleFolder(this)">
+        <div class="unit-title">
+          Unit Four <span class="arrow">&#9660;</span>
+        </div>
+        <div class="unit-name">Web and Media Design</div>
+        <div class="lessons-list">
+          <a
+            href="U 4 - Lesson 1.html"
+            class="lesson-card"
+            onclick="navigateLesson(event)"
+          >
+            <span class="lesson-number">4-1</span>
+            <span class="lesson-text">Media Characteristics</span>
+          </a>
+          <a
+            href="U 4 - Lesson 2.html"
+            class="lesson-card"
+            onclick="navigateLesson(event)"
+          >
+            <span class="lesson-number">4-2</span>
+            <span class="lesson-text">Information Design</span>
+          </a>
+          <a
+            href="U 4 - Lesson 3.html"
+            class="lesson-card"
+            onclick="navigateLesson(event)"
+          >
+            <span class="lesson-number">4-3</span>
+            <span class="lesson-text">Evaluating Websites</span>
+          </a>
+          <a
+            href="U 4 - Lesson 4.html"
+            class="lesson-card"
+            onclick="navigateLesson(event)"
+          >
+            <span class="lesson-number">4-4</span>
+            <span class="lesson-text">Iterative Improvement</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Link to external JS -->
+    <script src="script.js"></script>
+  </body>
+</html>
