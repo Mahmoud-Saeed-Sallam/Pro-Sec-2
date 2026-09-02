@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;800;900&family=Caveat:wght@600;700&display=swap');
+
+  :root {
+    --primary: #246b7a;
+    --primary-hover: #1d5562;
+    --secondary: #f4c118;
+    --accent: #e67e22;
+    --bg-gradient: linear-gradient(135deg, #e0f7fa 0%, #fffde7 100%);
+    --text-main: #1e293b;
+    --card-bg: rgba(255, 255, 255, 0.95);
+    --shadow-lg: 0 20px 40px rgba(0,0,0,0.1);
+    --radius: 20px;
+  }
+
+  @page { size: A4; margin: 25mm 15mm; }
+
+  body {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 14pt;
+    color: var(--text-main);
+    line-height: 1.7;
+    margin: 0;
+    padding: 40px 20px;
+    background: var(--bg-gradient);
+    background-attachment: fixed;
+    overflow-x: hidden;
+    counter-reset: page_counter;
+  }
+
+  /* Floating UI Elements */
+  .progress-container { position: fixed; top: 0; left: 0; width: 100%; height: 6px; background: #e2e8f0; z-index: 9999; }
+  .progress-bar { height: 6px; background: linear-gradient(to right, var(--secondary), var(--accent)); width: 0%; border-radius: 0 3px 3px 0; }
+
+  .pdf-btn, .index-btn {
+    position: fixed; right: 40px;
+    color: white; border: none; border-radius: 50%; width: 75px; height: 75px;
+    font-size: 25pt; cursor: pointer; z-index: 9999;
+    display: flex; justify-content: center; align-items: center;
+    transition: all 0.3s; text-decoration: none;
+  }
+  .pdf-btn { bottom: 40px; background: linear-gradient(135deg, var(--secondary), var(--accent)); box-shadow: 0 10px 25px rgba(244, 193, 24, 0.5); animation: pulseBtn 2s infinite; }
+  .index-btn { bottom: 130px; background: linear-gradient(135deg, var(--primary), #3b82f6); box-shadow: 0 10px 25px rgba(36, 107, 122, 0.5); }
+
+  .pdf-btn:hover, .index-btn:hover { transform: scale(1.15) rotate(10deg); animation: none; }
+
+  .pdf-tooltip {
+    position: absolute; right: 90px; background: #1e293b; color: white;
+    padding: 8px 15px; border-radius: 8px; font-size: 12pt; font-weight: bold;
+    opacity: 0; pointer-events: none; transition: 0.3s; white-space: nowrap;
+  }
+  .pdf-btn:hover .pdf-tooltip, .index-btn:hover .pdf-tooltip { opacity: 1; right: 100px; }
+
+  @keyframes pulseBtn { 0% { box-shadow: 0 0 0 0 rgba(244, 193, 24, 0.7); } 70% { box-shadow: 0 0 0 20px rgba(244, 193, 24, 0); } 100% { box-shadow: 0 0 0 0 rgba(244, 193, 24, 0); } }
+
+  .floating-bot {
+    position: fixed; font-size: 35pt; z-index: 9998; cursor: pointer;
+    animation: drift 20s linear infinite alternate, bob 3s ease-in-out infinite alternate;
+    filter: drop-shadow(0 5px 15px rgba(0,0,0,0.2)); transition: 0.3s;
+  }
+  .floating-bot:hover { transform: scale(1.5) !important; animation-play-state: paused; }
+  .bot-msg { position: absolute; top: -50px; left: 50%; transform: translateX(-50%); background: white; color: var(--primary); border: 2px solid var(--primary); padding: 8px 12px; border-radius: 15px; font-size: 12pt; font-weight: bold; opacity: 0; pointer-events: none; transition: 0.3s; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.1); font-family: 'Montserrat', sans-serif; }
+  .bot-msg::after { content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); border-width: 8px 8px 0; border-style: solid; border-color: var(--primary) transparent transparent transparent; }
+  .floating-bot:hover .bot-msg { opacity: 1; top: -60px; }
+  @keyframes drift { 0% { left: 5vw; } 100% { left: 85vw; } }
+  @keyframes bob { 0% { margin-top: 0; } 100% { margin-top: 50px; } }
+
+  /* Print Header/Footer */
+  .print-header { display: flex; justify-content: space-between; align-items: flex-end; position: fixed; top: 0; left: 0; width: 100%; border-bottom: 3px solid var(--secondary); padding-bottom: 10px; font-weight: bold; color: var(--primary); z-index: 1000; background: white; display:none; }
+  .school-logo { display: flex; align-items: center; font-size: 16pt; font-weight: 900; color: var(--primary); }
+  .school-logo img { height: 40px; margin-right: 15px; }
+  .print-footer { display: flex; justify-content: center; position: fixed; bottom: 0; left: 0; width: 100%; border-top: 2px solid #e2e8f0; padding-top: 10px; font-size: 10pt; color: #64748b; font-weight: 600; display:none; background: white; z-index: 1000;}
+
+  /* Pages */
+  .page-break, .cover-page, .unit-cover {
+    background: var(--card-bg); max-width: 950px; margin: 0 auto 50px auto;
+    border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: 60px;
+    position: relative; overflow: hidden; border: 2px solid rgba(255,255,255,0.8);
+    animation: fadeUp 0.8s ease-out forwards;
+    page-break-after: always;
+  }
+  .page-break::after {
+    content: ''; position: absolute; top: 15px; left: 15px; right: 15px; bottom: 15px;
+    border: 2px dashed rgba(36, 107, 122, 0.3); border-radius: 15px; pointer-events: none; z-index: 0;
+  }
+  .page-break > * { position: relative; z-index: 1; }
+
+  .page-number { position: absolute; bottom: 30px; right: 40px; font-weight: bold; color: var(--primary); font-size: 12pt; z-index: 2; }
+  .page-number::after { counter-increment: page_counter; content: "Page " counter(page_counter); }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Typography */
+  h1 { font-size: 28pt; font-weight: 900; background: linear-gradient(to right, var(--primary), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-top: 0; margin-bottom: 25px; border-bottom: 2px dashed rgba(36, 107, 122, 0.3); padding-bottom: 15px; }
+  h2 { font-size: 22pt; color: var(--primary); margin-top: 30px; font-weight: 800; }
+  h3 { font-size: 17pt; color: var(--accent); margin-top: 25px; font-weight: 700; }
+  p { margin-bottom: 18px; color: #334155; }
+  a { color: var(--primary); text-decoration: none; font-weight: bold; }
+  a:hover { color: var(--accent); text-decoration: underline; }
+
+  /* Covers */
+  .cover-page, .unit-cover { background: linear-gradient(135deg, var(--primary) 0%, #11363d 100%); color: #fff; text-align: center; padding: 150px 40px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: none; }
+  .cover-page::before, .unit-cover::before { content: ""; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(244,193,24,0.15) 0%, transparent 60%); z-index: 0; animation: spin 20s linear infinite; }
+  .school-badge { background: linear-gradient(to right, var(--secondary), #ffeb3b); color: #000; font-weight: 900; font-size: 18pt; padding: 15px 30px; border-radius: 30px; margin-bottom: 40px; z-index: 1; text-transform: uppercase; letter-spacing: 2px; box-shadow: 0 0 20px rgba(244, 193, 24, 0.5); display: flex; align-items: center; }
+  .school-badge img { height: 50px; margin-right: 15px; border-radius: 50%; background: white; padding: 5px; }
+  .cover-page h1, .unit-cover h1 { background: linear-gradient(to right, #fff, var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 40pt; border: none; z-index: 1; }
+  .cover-page h2, .unit-cover p, .unit-cover h2 { color: #e0f2f1; z-index: 1; font-weight: 500; font-size: 20pt; }
+
+  /* TOC */
+  .toc h1 { text-align: center; }
+  .toc-unit { background: #ffffff; padding: 20px 25px; border-radius: 15px; box-shadow: var(--shadow-sm); border-left: 6px solid var(--primary); margin-bottom: 25px; transition: 0.3s; }
+  .toc-unit:hover { transform: translateX(10px); box-shadow: var(--shadow-lg); border-left-color: var(--secondary); }
+  .toc-unit h3 { margin: 0 0 10px 0; color: var(--primary); }
+  .toc ul { list-style: none; padding-left: 0; }
+  .toc li { margin-bottom: 10px; padding-left: 30px; position: relative; color: #475569; font-weight: 600; }
+  .toc li::before { content: "✦"; color: var(--secondary); position: absolute; left: 0; font-size: 16pt; }
+
+  /* Content Boxes */
+  .hero-img { width: 100%; height: 200px; background: linear-gradient(45deg, var(--primary), var(--secondary)); border-radius: 15px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 22pt; letter-spacing: 2px; margin-bottom: 30px; box-shadow: inset 0 0 20px rgba(0,0,0,0.2); text-transform: uppercase; text-shadow: 2px 2px 4px rgba(0,0,0,0.4); }
+  .obj-box { background: #e0f7fa; border-left: 8px solid var(--primary); padding: 25px; border-radius: 0 15px 15px 0; margin-bottom: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); transition: 0.3s; }
+  .obj-box:hover { transform: scale(1.02); }
+  .obj-box h2 { color: var(--primary); font-size: 18pt; margin-top: 0; }
+  .warmup-box { background: #fffde7; border-left: 8px solid var(--secondary); padding: 25px; border-radius: 0 15px 15px 0; margin-bottom: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+  .warmup-box h2 { color: #e65100; font-size: 18pt; margin-top: 0; }
+  .handwritten { font-family: 'Caveat', cursive; background: linear-gradient(135deg, #fef08a 0%, #fde047 100%); padding: 25px 35px; border-radius: 5px 15px 25px 5px; margin: 40px 0; font-size: 20pt; color: #422006; transform: rotate(-1.5deg); box-shadow: 4px 6px 15px rgba(0,0,0,0.1); transition: 0.3s; }
+  .handwritten:hover { transform: rotate(0deg) scale(1.03); box-shadow: 6px 10px 20px rgba(0,0,0,0.15); }
+  .handwritten strong { color: #b45309; font-size: 22pt; display: block; margin-bottom: 10px; }
+  .diagram-box { width: 100%; padding: 30px; background-color: #f1f5f9; border: 2px dashed #64748b; border-radius: 12px; text-align: center; color: #334155; font-weight: 700; margin-bottom: 25px; }
+
+  /* Tables & Grids */
+  table { width: 100%; border-collapse: collapse; margin-bottom: 30px; background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+  th, td { padding: 15px; text-align: left; border: 1px solid #e2e8f0; }
+  th { background: var(--primary); color: white; font-weight: 700; text-transform: uppercase; }
+  .grid-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 30px; }
+  .grid-item { background: #fff; border: 2px solid #e2e8f0; padding: 20px; border-radius: 15px; transition: 0.3s; }
+  .grid-item:hover { border-color: var(--secondary); transform: translateY(-5px); box-shadow: 0 10px 20px rgba(244,193,24,0.15); }
+  .grid-item h4 { margin: 0 0 10px 0; color: var(--primary); border-bottom: 2px solid var(--secondary); padding-bottom: 5px; display: inline-block; }
+
+  /* Exercises */
+  .exercise-section { background: #ffffff; padding: 25px; border-radius: 15px; border: 1px solid #e2e8f0; margin-bottom: 25px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); transition: 0.3s; }
+  .exercise-section:hover { border-color: var(--primary); }
+  .ex-q { font-weight: 800; color: var(--primary); margin-bottom: 15px; font-size: 15pt; }
+  .mcq-opts div, .tf-box div { padding: 12px 20px; background: #f8fafc; border-radius: 10px; margin-bottom: 10px; cursor: pointer; transition: 0.3s; font-weight: 600; border: 2px solid transparent; }
+  .mcq-opts div:hover, .tf-box div:hover { background: #e0f7fa; border-color: var(--primary); color: var(--primary); transform: translateX(10px); }
+  .tf-box { display: flex; gap: 15px; } .tf-box div { flex: 1; text-align: center; }
+  .match-list { list-style: none; padding: 0; }
+  .match-list li { padding: 15px; background: #f8fafc; margin-bottom: 10px; border-radius: 10px; display: flex; justify-content: space-between; transition: 0.3s; font-weight: 500; }
+  .match-list li:hover { background: #e0f7fa; transform: scale(1.01); }
+  .short-box, .long-box { background: #f1f5f9; border: 2px dashed #cbd5e1; border-radius: 10px; transition: 0.3s; }
+  .short-box { height: 70px; margin-top: 15px; } .long-box { height: 200px; margin-top: 15px; padding: 15px; color: #94a3b8; font-style: italic; }
+  .short-box:hover, .long-box:hover { border-color: var(--secondary); background: #fff; }
+
+  @media print {
+    body { background: white; padding: 0; margin:0;}
+    .pdf-btn, .index-btn, .floating-bot, .progress-container { display: none !important; }
+    .page-break { margin: 0; box-shadow: none; border: none; padding: 25mm 15mm; page-break-after: always; animation: none; }
+    .page-break::after { display: none; }
+    .cover-page, .unit-cover { -webkit-print-color-adjust: exact; background: var(--primary) !important; color: white !important; }
+    .print-header { display: flex !important; }
+    .print-footer { display: flex !important; }
+    .page-number { bottom: 15px; right: 15px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="progress-container"><div class="progress-bar" id="myBar"></div></div>
+
+<div class="print-header">
+    <div class="school-logo"><img src="" alt="Logo"> AlKhalil Language Schools</div>
+    <div>Programming & AI - Sec 2</div>
+</div>
+<div class="print-footer">
+    <div>Prepared for: AlKhalil Language Schools Students</div>
+</div>
+
+<a href="#toc" class="index-btn" title="Go to Index">📑 <span class="pdf-tooltip">Index</span></a>
+<button class="pdf-btn" onclick="saveToPDF()" title="Save as PDF">📥 <span class="pdf-tooltip">Save PDF!</span></button>
+
+<div class="cover-page">
+    <div class="school-badge"><img src="" alt="Logo"> AlKhalil Language Schools</div>
+    <h1>PROGRAMMING AND ARTIFICIAL INTELLIGENCE</h1>
+    <h2>Part (1) - Second Secondary / Baccalaureate (Age 15)</h2>
+</div>
+
+<div class="page-break toc" id="toc"><h1>Table of Contents</h1>
+<div class="toc-unit"><h3>Unit 1: Information Technology & Society</h3><ul><li><a href="#u1l0">Lesson 1: Development of Information Technology and Social Transformation</a></li><li><a href="#u1l1">Lesson 2: How AI Works</a></li><li><a href="#u1l2">Lesson 3: AI in Daily Life and Industry</a></li><li><a href="#u1l3">Lesson 4: Ethical Issues with AI</a></li></ul></div><div class="toc-unit"><h3>Unit 2: Cybersecurity</h3><ul><li><a href="#u2l0">Lesson 1: Cryptographic Technologies and Authentication</a></li><li><a href="#u2l1">Lesson 2: Network Security Design</a></li><li><a href="#u2l2">Lesson 3: Incident Response and Risk Management</a></li></ul></div><div class="toc-unit"><h3>Unit 3: Web Applications</h3><ul><li><a href="#u3l0">Lesson 1: The Overall Structure of Web Applications</a></li><li><a href="#u3l1">Lesson 2: Web Application Communication Methods</a></li><li><a href="#u3l2">Lesson 3: Fundamentals of Frontend Technology</a></li></ul></div><div class="toc-unit"><h3>Unit 4: Web and Media Design</h3><ul><li><a href="#u4l0">Lesson 1: Types and Characteristics of Media</a></li><li><a href="#u4l1">Lesson 2: Information Design and User Experience</a></li><li><a href="#u4l2">Lesson 3: Methods for Evaluating Websites</a></li><li><a href="#u4l3">Lesson 4: The Iterative Improvement Process</a></li></ul></div><div class="page-number"></div></div>
+    <div class="page-break unit-cover">
+        <h2>Unit 1</h2>
+        <h1>Information Technology & Society</h1>
+        <p>Exploring the evolution of IT, the mechanics of AI, its applications in industry, and the critical ethical issues surrounding its use.</p>
+        <div class="page-number"></div>
+    </div>
+
+        <div class="page-break" id="u1l0">
+            <h1>Lesson 1: Development of Information Technology and Social Transformation</h1>
+            <div class="hero-img">DEVELOPMENT CONCEPT</div>
+
+            <div class="obj-box">
+                <h2>Learning Objectives</h2>
+                <ul>
+                    <li>Explain the major stages in the development of information technology and their impact on society.</li><li>Give examples of social changes and emerging technologies brought about by information technology.</li><li>Explain the characteristics of these emerging technologies.</li>
+                </ul>
+            </div>
+
+            <div class="warmup-box">
+                <h2>Warm-up Question</h2>
+                <p>How has information technology developed through its major stages, and how has each stage changed society?</p>
+            </div>
+            <div class="page-number"></div>
+        </div>
+        <div class="page-break"><h1>Explanation (Part 1)</h1><h3>The History of Information Technology (IT)</h3><p>Twenty years ago, many services we rely on today were not possible. IT has developed through a series of stages, becoming smaller and more interconnected.</p><table><thead><tr><th>Time period</th><th>Major technologies and Events</th><th>Impact on society</th></tr></thead><tbody><tr><td>1940s-60s</td><td>Birth of the computer ENIAC, vacuum tubes. Computers filled a whole room.</td><td>Mainly used for: 1- military purposes, 2- scientific computation.</td></tr><tr><td>1970s-80s</td><td>Spread of personal computers (PCs).</td><td>Beginning of personal computer use.</td></tr><tr><td>1990s</td><td>Commercialization of the Internet; the Web.</td><td>Global access to information and spread of email.</td></tr><tr><td>2000s</td><td>Rise of smartphones (iPhone, etc.).</td><td>Explosive, rapid, and widespread spread of mobile Internet.</td></tr><tr><td>2010s onward</td><td>Spread of cloud computing.</td><td>Large-scale data analysis and AI; IT resources provided as services over the Internet.</td></tr></tbody></table><h3>Moore's Law</h3><p>Moore's Law is the empirical observation that 'the number of transistors on an integrated circuit doubles approximately every two years.' This led to dramatically increased computing power. However, miniaturization is approaching a physical limit, causing problems like the quantum tunneling effect and leakage current.</p><div class="page-number"></div></div><div class="page-break"><h1>Explanation (Part 2)</h1><h3>Social Changes Resulting from IT</h3><ul><li>SNS (Social Networking Service): Connect users to post and share information rapidly.</li><li>E-commerce (EC): Buying and selling goods and services through the Internet.</li><li>Remote Work: Working from home or another remote location using the Internet.</li><li>Online Learning: Classes and materials delivered over the Internet.</li><li>Cashless Payment: Payment without cash (e-money, QR codes, cards).</li></ul><h3>Notable Emerging Technologies</h3><div class="grid-container"><div class="grid-item"><h4>Autonomous Driving</h4><p>Uses AI to drive a vehicle without human operation. Uses edge computing for instant processing on board.</p></div><div class="grid-item"><h4>AR (Augmented Reality)</h4><p>Overlays digital information on real-world images.</p></div><div class="grid-item"><h4>VR (Virtual Reality)</h4><p>Allows users to immerse themselves in a virtual space generated by a computer.</p></div><div class="grid-item"><h4>Quantum Computing</h4><p>Expected to dramatically speed up complex computations using qubits (superposition: 0 and 1 at once).</p></div></div><div class="handwritten"><strong>Pause & Think:</strong><br>Of these five changes, which would be hardest to give up — and why? <br>Answer: The Internet may be the hardest to give up because it has become essential for communication, online learning, remote work, and everyday services.</div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 1)</h1><div class="exercise-section"><div class='ex-q'>Multiple Choice: Choose the one that lists the stages of IT development in the correct chronological order.</div><div class='mcq-opts'><div>&#9711; A- Birth of the computer -> Rise of smartphones -> Commercialization of the Internet -> Spread of cloud computing.</div><div>&#9711; B- Birth of the computer -> Commercialization of the Internet -> Rise of smartphones -> Spread of cloud computing.</div><div>&#9711; C- Commercialization of the Internet -> Birth of the computer -> Spread of cloud computing -> Rise of smartphones.</div><div>&#9711; D- Rise of smartphones -> Commercialization of the Internet -> Birth of the computer -> Spread of cloud computing.</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: Moore's Law is the empirical observation that 'the number of transistors on an integrated circuit doubles approximately every two years.'</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: Moore's Law has been said to be approaching a physical limit in recent years.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: SNS is highly effective at spreading information rapidly.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>Matching: Match each description with the most appropriate technology (A- Autonomous driving, B- AR, C- VR):</div><ul class='match-list'><li><span>1) A technology that overlays digital information on real-world images.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>2) A technology that uses AI to drive a vehicle without human operation.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>3) A technology that allows users to immerse themselves in a virtual space generated by a computer.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li></ul></div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 2)</h1><div class="exercise-section"><div class='ex-q'>What technology, which spread from the 2010s onward, supports largescale data analysis and the use of AI?</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>According to Moore's Law, about how often does the number of transistors on an integrated circuit double?</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>EXAM-STYLE QUESTION: Analyze how the spread of cloud computing (from the 2010s onward) has changed the way information technology is used. [6]
+In your answer, refer to: large-scale data analysis, AI, and 'IT as a service'.</div><div class='long-box'>Write your detailed response here...</div></div><div class="exercise-section"><div class='ex-q'>A village that has never had Internet access is connected to high-speed Internet and cashless payment for the first time. Predict two ways daily life will change, and identify one new problem the village may face.</div><div class='long-box'>Write your detailed response here...</div></div><div class="page-number"></div></div>
+        <div class="page-break" id="u1l1">
+            <h1>Lesson 2: How AI Works</h1>
+            <div class="hero-img">HOW CONCEPT</div>
+
+            <div class="obj-box">
+                <h2>Learning Objectives</h2>
+                <ul>
+                    <li>Explain what AI is.</li><li>Understand the relationship between Machine Learning and Deep Learning.</li><li>Explain how generative AI is positioned within AI technologies.</li>
+                </ul>
+            </div>
+
+            <div class="warmup-box">
+                <h2>Warm-up Question</h2>
+                <p>What is AI, and how are machine learning, deep learning, and generative AI related?</p>
+            </div>
+            <div class="page-number"></div>
+        </div>
+        <div class="page-break"><h1>Explanation (Part 1)</h1><h3>What is Artificial Intelligence (AI)?</h3><p>AI is a general term for technologies that reproduce or perform intelligent human behavior: learning, reasoning, and judgment on a computer. Three everyday AI examples: speech understanding, image recognition, and translation.</p><div class="diagram-box">[ Nested Categories Diagram: AI (Outer) -> ML -> DL -> GenAI (Inner) ]</div><h3>The Relationship between AI and Machine Learning</h3><p>Within AI technologies, there is machine learning; within machine learning, there is deep learning; and within deep learning, there is generative AI. Most current AI systems are narrow AI, designed to perform a specific task.</p><h3>Machine Learning (ML)</h3><p>One of the learning technologies that makes AI work. It learns patterns from data to make predictions, classifications, or support decisions, rather than programming every rule explicitly. Examples: spam email classification, product recommendations.</p><div class="page-number"></div></div><div class="page-break"><h1>Explanation (Part 2)</h1><h3>Deep Learning (DL)</h3><p>An advanced technology within machine learning that uses neural networks. It learns complex patterns using large-scale data. Examples: image analysis for autonomous driving, speech recognition.</p><h3>Artificial Neural Network (ANN)</h3><p>A system modeled after the workings of the nerve cells (neurons) of the human brain. By connecting many simple components (input layer, hidden layers, output layer), it learns from data and becomes capable of making complex judgments. While training, it updates weights to reduce error.</p><h3>Generative AI (GenAI)</h3><p>AI technology that uses deep learning to generate new data (text, images, audio, programs, etc.) depending on patterns learned from training data. Examples: ChatGPT, image generation AIs.</p><div class="handwritten"><strong>Pause & Think:</strong><br>Spam filters and product recommendations are completely different tasks. What do they have in common?<br>Answer: Both learn patterns from data instead of being explicitly programmed with rules.</div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 1)</h1><div class="exercise-section"><div class='ex-q'>Multiple Choice: Choose the one that correctly describes the relationship between AI, machine learning, deep learning, and generative AI.</div><div class='mcq-opts'><div>&#9711; A- AI > Deep Learning > Machine Learning > Generative AI</div><div>&#9711; B- Machine Learning > AI > Generative AI > Deep Learning</div><div>&#9711; C- AI > Machine Learning > Deep Learning > Generative AI</div><div>&#9711; D- Generative AI > Deep Learning > Machine Learning > AI</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: Machine learning is one of the technologies that makes AI work.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: Generative AI is a technology that uses deep learning to generate new data.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: AI and machine learning have the exact same meaning.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>Matching: Match each example with the most closely related technology (A- Machine learning, B- Deep learning, C- Generative AI):</div><ul class='match-list'><li><span>1) Automatically sorting spam emails</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>2) Recognizing pedestrians on the road in autonomous driving</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>3) Automatically generating new images from text</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li></ul></div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 2)</h1><div class="exercise-section"><div class='ex-q'>What is the general term, expressed by a two-letter abbreviation, for technologies that reproduce or perform intelligent human behavior on a computer?</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>What is the term for the advanced technology within machine learning that uses neural networks?</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>EXAM-STYLE QUESTION: Analyze the relationship between AI, machine learning, deep learning, and generative AI. [6]
+In your answer: use the idea of nested categories and give one example of each.</div><div class='long-box'>Write your detailed response here...</div></div><div class="exercise-section"><div class='ex-q'>Deep learning needs large-scale data to learn. Why might an AI struggle with something it has rarely seen in its data?</div><div class='long-box'>Write your detailed response here...</div></div><div class="page-number"></div></div>
+        <div class="page-break" id="u1l2">
+            <h1>Lesson 3: AI in Daily Life and Industry</h1>
+            <div class="hero-img">AI CONCEPT</div>
+
+            <div class="obj-box">
+                <h2>Learning Objectives</h2>
+                <ul>
+                    <li>Give examples of how AI is used in daily life and various industries.</li><li>Explain what AI is good at.</li><li>Identify what requires caution when using AI.</li>
+                </ul>
+            </div>
+
+            <div class="warmup-box">
+                <h2>Warm-up Question</h2>
+                <p>Where is AI used in daily life and industry, what is AI good at, and what needs caution?</p>
+            </div>
+            <div class="page-number"></div>
+        </div>
+        <div class="page-break"><h1>Explanation (Part 1)</h1><h3>Use of AI in Daily Life</h3><table><thead><tr><th>Service</th><th>Role of AI</th><th>Examples</th></tr></thead><tbody><tr><td>Recommendation Systems</td><td>Predict preferences from past behavior data and display recommendations.</td><td>YouTube, Amazon, Spotify</td></tr><tr><td>Voice Assistants</td><td>Recognize a voice, understand commands, and execute them.</td><td>Siri, Google Assistant</td></tr><tr><td>Machine Translation</td><td>Automatically translate text into different languages.</td><td>Google Translate, DeepL</td></tr><tr><td>Face Recognition</td><td>Automatically detect and identify human faces in photographs.</td><td>Smartphone unlocking</td></tr></tbody></table><h3>Use of AI in Industry</h3><div class="grid-container"><div class="grid-item"><h4>Healthcare</h4><p>Image-diagnosis AI (detecting diseases from X-ray and CT images) and drug-discovery support.</p></div><div class="grid-item"><h4>Agriculture</h4><p>Predicting harvest timing, and detecting pests and diseases.</p></div><div class="grid-item"><h4>Manufacturing</h4><p>Automation of product quality inspection and predictive maintenance.</p></div><div class="grid-item"><h4>Logistics</h4><p>Optimization of delivery routes.</p></div></div><div class="page-number"></div></div><div class="page-break"><h1>Explanation (Part 2)</h1><h3>What AI is Good At</h3><ul><li>Finding and classifying patterns in complex data such as images and text.</li><li>Recognition and generation of images, audio, and text.</li><li>Probabilistic reasoning and prediction based on data.</li></ul><h3>What Requires Caution When Using AI</h3><ul><li>Ethical judgments (may lead to discrimination or prejudice).</li><li>Judgments involving personal information or privacy.</li><li>Final decision-making (who is responsible for the result).</li><li>Accuracy of judgments when training data is biased.</li><li>Generating content that differs from the facts (hallucination).</li><li>Issues of rights when using copyrighted works as training data.</li><li>Loss of clarity about how a judgment was made (the black-box problem).</li></ul><div class="handwritten"><strong>Pause & Think:</strong><br>A hospital uses image-diagnosis AI. Why should the final diagnosis be confirmed by a human doctor?<br>Answer: Final diagnosis is a high-impact decision. AI may make errors if training data is biased, and the black-box problem makes its reasoning unclear.</div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 1)</h1><div class="exercise-section"><div class='ex-q'>Multiple Choice: From the following options, choose the one that does NOT belong to 'what requires caution when using AI'.</div><div class='mcq-opts'><div>&#9711; A- Ethical judgments</div><div>&#9711; B- Finding and classifying patterns</div><div>&#9711; C- Judgments involving personal information or privacy</div><div>&#9711; D- Final decision-making</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: AI is good at probabilistic reasoning and prediction based on data.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: It is fine to leave ethical judgments entirely to AI.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: AI judgments can become inaccurate when training data is biased.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>Matching: Match the AI usage example with the related industry (A- Healthcare, B- Agriculture, C- Manufacturing, D- Logistics):</div><ul class='match-list'><li><span>1) Optimizing delivery routes.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>2) Detecting diseases from X-ray images.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>3) Detecting pests and diseases.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>4) Automating product quality inspection.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li></ul></div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 2)</h1><div class="exercise-section"><div class='ex-q'>What is the term for the system that predicts preferences from past behavior data and displays recommendations?</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>In manufacturing, what is the term for the system that predicts product failures in advance?</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>EXAM-STYLE QUESTION: Analyze why AI is well suited to some tasks but requires caution in others. [6]
+In your answer: refer to what AI is good at (finding patterns, recognition, prediction) and to what needs caution.</div><div class='long-box'>Write your detailed response here...</div></div><div class="exercise-section"><div class='ex-q'>A school library wants to use AI to recommend books to students. Explain how the AI would work, and identify one caution the school should consider.</div><div class='long-box'>Write your detailed response here...</div></div><div class="page-number"></div></div>
+        <div class="page-break" id="u1l3">
+            <h1>Lesson 4: Ethical Issues with AI</h1>
+            <div class="hero-img">ETHICAL CONCEPT</div>
+
+            <div class="obj-box">
+                <h2>Learning Objectives</h2>
+                <ul>
+                    <li>Explain what algorithmic bias is and describe its main causes.</li><li>Connect the basic principles of AI ethics to specific situations.</li><li>Understand privacy and explainability.</li>
+                </ul>
+            </div>
+
+            <div class="warmup-box">
+                <h2>Warm-up Question</h2>
+                <p>What ethical issues arise as AI spreads, and what principles should guide how we use it?</p>
+            </div>
+            <div class="page-number"></div>
+        </div>
+        <div class="page-break"><h1>Explanation (Part 1)</h1><h3>Algorithmic Bias</h3><p>Bias in AI judgments is caused by bias in the training data. If training data is biased, an AI can reproduce that bias in its judgments. Examples include a hiring AI unfairly evaluating a particular gender, or a face-recognition AI misidentifying particular ethnic groups.</p><p>Main causes: Insufficient data on certain attributes, past discriminatory tendencies reflected in the data, or inappropriate choice of proxy variables.</p><h3>Privacy Issues</h3><p>The development of AI technology has given rise to new issues concerning privacy: Surveillance through face-recognition technology (cameras tracking individuals in public spaces) and mass collection of personal data online.</p><h3>Explainable AI (XAI) and Responsibility</h3><p>XAI is technology that makes it possible for humans to understand why an AI made a particular judgment. When an AI's process is opaque (a black box), it is difficult to verify accuracy. Responsibility deals with who answers when an AI judgment is wrong.</p><div class="page-number"></div></div><div class="page-break"><h1>Explanation (Part 2)</h1><h3>The Fundamental Principles of AI Ethics</h3><div class="grid-container"><div class="grid-item"><h4>1. Fairness</h4><p>No unjust discrimination against a person or group.</p></div><div class="grid-item"><h4>2. Transparency</h4><p>Showing the AI's decision-making process and inner workings clearly.</p></div><div class="grid-item"><h4>3. Privacy Protection</h4><p>Handling personal information appropriately and protecting privacy.</p></div><div class="grid-item"><h4>4. Accountability</h4><p>Being answerable for the AI's decisions and outcomes.</p></div></div><div class="diagram-box">[ Balance Scale Graphic Placeholder: AI Efficiency vs Ethics & Privacy ]</div><div class="handwritten"><strong>Pause & Think:</strong><br>If no one can explain why an AI rejected someone's job application, is that fair? Which principle is missing?<br>Answer: It is not fair. The missing principle is transparency, which relates to the need for Explainable AI (XAI).</div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 1)</h1><div class="exercise-section"><div class='ex-q'>Multiple Choice: Choose the one that is NOT an appropriate cause of algorithmic bias.</div><div class='mcq-opts'><div>&#9711; A- Training data is biased.</div><div>&#9711; B- Past discriminatory tendencies are reflected in the data.</div><div>&#9711; C- The processing speed of the computer is slow.</div><div>&#9711; D- There is insufficient data on certain attributes.</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: Algorithmic bias is bias in AI judgments caused by bias in the training data.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: Even if an AI's decision-making process is opaque, there is no problem as long as the result is correct.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: Explainable AI (XAI) is a technology that makes it possible for humans to understand the AI's reasoning.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>Matching: Match each description with the most appropriate AI ethics principle (A- Fairness, B- Transparency, C- Privacy protection, D- Accountability):</div><ul class='match-list'><li><span>1) Not unjustly discriminating against any particular person or group.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>2) Showing the AI's decision-making process and inner workings clearly.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>3) Handling personal information appropriately.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>4) Being answerable for the AI's decisions.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li></ul></div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 2)</h1><div class="exercise-section"><div class='ex-q'>What is the term for the technology that makes it possible for humans to understand why an AI made a particular judgment? (Give abbreviation).</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>What is the term for the phenomenon in which bias arises in AI judgments due to bias in the training data?</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>EXAM-STYLE QUESTION: Analyze how algorithmic bias can arise in an AI system, and how it can be reduced. [6]
+Refer to the cause of bias and how fairness and transparency help.</div><div class='long-box'>Write your detailed response here...</div></div><div class="exercise-section"><div class='ex-q'>A school wants to use face-recognition cameras to record attendance. Identify one practical benefit and one privacy concern. Who should be responsible if it fails?</div><div class='long-box'>Write your detailed response here...</div></div><div class="page-number"></div></div>
+    <div class="page-break">
+        <h1>Unit 1 Summary & Reflection</h1>
+        <div class="obj-box">
+            <h2>Unit Overview</h2>
+            <p>You have completed Information Technology & Society. Use this space to synthesize the core concepts from the lessons, map out critical vocabulary, and prepare for comprehensive assessments.</p>
+        </div>
+        <div class="long-box" style="height: 500px; padding: 20px;">
+           <p style="font-size: 16pt;">Personal Notes & Key Takeaways:</p>
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+        </div>
+        <div class="page-number"></div>
+    </div>
+
+    <div class="page-break unit-cover">
+        <h2>Unit 2</h2>
+        <h1>Cybersecurity</h1>
+        <p>Understanding Cryptographic Technologies, Network Security Design, and Incident Response & Risk Management.</p>
+        <div class="page-number"></div>
+    </div>
+
+        <div class="page-break" id="u2l0">
+            <h1>Lesson 1: Cryptographic Technologies and Authentication</h1>
+            <div class="hero-img">CRYPTOGRAPHIC CONCEPT</div>
+
+            <div class="obj-box">
+                <h2>Learning Objectives</h2>
+                <ul>
+                    <li>Explain how HTTPS secures communication.</li><li>Describe how the TLS handshake uses public-key and common-key cryptography.</li><li>Describe how multi-factor authentication is used in real services.</li>
+                </ul>
+            </div>
+
+            <div class="warmup-box">
+                <h2>Warm-up Question</h2>
+                <p>How do cryptographic technologies and authentication work together to keep online communication and services secure?</p>
+            </div>
+            <div class="page-number"></div>
+        </div>
+        <div class="page-break"><h1>Explanation (Part 1)</h1><h3>How HTTPS Communication Works</h3><p>HTTPS (HTTP Secure) is a communication protocol that adds TLS encryption to HTTP. It provides encryption, detection of tampering, and verification of the communication partner. The procedure to establish secure communication is called the TLS handshake.</p><table><thead><tr><th>Stage</th><th>What happens</th><th>Cryptographic method</th></tr></thead><tbody><tr><td>1. Connection (Cert Verification)</td><td>Server sends digital certificate & public key. Browser verifies via Certificate Authority (CA).</td><td>Public-key cryptography</td></tr><tr><td>2. Key Exchange (Session Key)</td><td>Browser creates a common key, encrypts it with the server's public key, and sends it.</td><td>Public-key cryptography</td></tr><tr><td>3. Data Transfer</td><td>Data is encrypted and exchanged using the shared common key.</td><td>Common-key cryptography</td></tr></tbody></table><p>Public-key cryptography locks with a public key and unlocks with a different private key. Common-key (symmetric-key) cryptography uses the same key for both, allowing faster data transfer.</p><div class="page-number"></div></div><div class="page-break"><h1>Explanation (Part 2)</h1><h3>Authentication in Real Services</h3><p>Two-Factor Authentication (2FA) uses two different factors to verify identity. Multi-Factor Authentication (MFA) uses two or more factors from: Knowledge (password), Possession (smartphone/SMS), Biometrics (fingerprint). Using an independent second factor reduces the likelihood of unauthorized access if a password is compromised.</p><h3>Combinations of Security Technologies</h3><ul><li>Encryption: Prevents communication content from being read by third parties.</li><li>Digital Signature: Detects data tampering or impersonation and provides non-repudiation.</li><li>Digital Certificate: Verifies that the communication partner is authentic.</li><li>Multi-factor Authentication: Prevents unauthorized logins.</li></ul><div class="handwritten"><strong>Pause & Think:</strong><br>If a password is leaked, why can a second factor sent to a phone still keep the account safe?<br>Answer: Because knowing the password alone is not enough to gain access; the attacker still needs the physical device.</div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 1)</h1><div class="exercise-section"><div class='ex-q'>Multiple Choice: Choose the one that is NOT an appropriate description of combinations of security technologies.</div><div class='mcq-opts'><div>&#9711; A- Encryption prevents communication from being read by third parties.</div><div>&#9711; B- Digital signatures are a technology that improves communication speed.</div><div>&#9711; C- Digital certificates verify the partner is authentic.</div><div>&#9711; D- By combining multiple technologies, various threats can be addressed.</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: HTTPS communication uses both public-key cryptography and common-key cryptography.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: HTTPS communication exchanges all data using only public-key cryptography.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: An example of multi-factor authentication is setting two different passwords.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>Matching: Match each threat with the most appropriate security technology (A- Encryption, B- Digital Signature, C- Digital certificate):</div><ul class='match-list'><li><span>1) Prevent communication content from being read by third parties.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>2) Verify that data has not been altered during communication.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>3) Verify that the communication partner is authentic.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li></ul></div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 2)</h1><div class="exercise-section"><div class='ex-q'>In HTTPS communication, what cryptographic method is used for data communication after the common key has been shared?</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>Briefly explain the reason for using common-key cryptography rather than public-key cryptography for bulk data communication.</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>EXAM-STYLE QUESTION: Explain why HTTPS uses public-key cryptography to share the key but common-key cryptography to exchange the data. [6]</div><div class='long-box'>Write your detailed response here...</div></div><div class="exercise-section"><div class='ex-q'>A small online shop wants to secure both customer login and payment. Name two security technologies it should use and say where each one helps.</div><div class='long-box'>Write your detailed response here...</div></div><div class="page-number"></div></div>
+        <div class="page-break" id="u2l1">
+            <h1>Lesson 2: Network Security Design</h1>
+            <div class="hero-img">NETWORK CONCEPT</div>
+
+            <div class="obj-box">
+                <h2>Learning Objectives</h2>
+                <ul>
+                    <li>Explain the roles of firewalls, VPNs, and DMZs in protecting a network.</li><li>Describe defense in depth.</li><li>Explain why layered, verified access (zero trust) is stronger than a single barrier.</li>
+                </ul>
+            </div>
+
+            <div class="warmup-box">
+                <h2>Warm-up Question</h2>
+                <p>How can an organization design its network so that, even if one defense is breached, the system stays protected?</p>
+            </div>
+            <div class="page-number"></div>
+        </div>
+        <div class="page-break"><h1>Explanation (Part 1)</h1><h3>The Role of Firewalls and VPNs</h3><p>A firewall is a system installed at the entry/exit point of a network that allows or denies communication based on predefined security rules. A VPN (Virtual Private Network) creates an encrypted virtual private line (tunnel) over the Internet, allowing safe connection to a network from a remote location. It reduces the risk of eavesdropping even on public Wi-Fi.</p><h3>DMZ (Demilitarized Zone)</h3><p>An area where servers exposed to the external network (web servers, mail servers) are placed separately from the internal network. Even if a public-facing server in the DMZ is attacked, damage to the internal network can be prevented.</p><div class="page-number"></div></div><div class="page-break"><h1>Explanation (Part 2)</h1><h3>Defense in Depth</h3><p>The concept of layering multiple security measures so that, even if one measure is breached, the next can still protect the system.</p><table><thead><tr><th>Layer</th><th>Examples of measures</th></tr></thead><tbody><tr><td>Layer 1: Network entry</td><td>Block unauthorized communication using a firewall.</td></tr><tr><td>Layer 2: Communication path</td><td>Encrypt communication using a VPN.</td></tr><tr><td>Layer 3: Server placement</td><td>Separate public-facing servers from internal network using DMZ.</td></tr><tr><td>Layer 4: Endpoints</td><td>Install antivirus software and keep the OS updated.</td></tr></tbody></table><h3>Zero Trust</h3><p>Conventional network security assumed 'inside is safe, outside is dangerous' (perimeter security). With cloud services and remote work, this boundary blurred. Zero Trust is a security concept that means the system does not trust any communication (even from inside) and always verifies every access.</p><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 1)</h1><div class="exercise-section"><div class='ex-q'>Multiple Choice: Choose the most appropriate reason for providing a DMZ.</div><div class='mcq-opts'><div>&#9711; A- To improve communication speed.</div><div>&#9711; B- To expose all servers to the outside.</div><div>&#9711; C- To prevent damage to the internal network even if a public-facing server is attacked.</div><div>&#9711; D- To automatically detect and remove viruses.</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: A firewall allows or denies communication based on rules set in advance.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: Using a VPN can reduce the risk of eavesdropping even on public Wi-Fi.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: A DMZ is a system that exposes all servers to the outside.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>Matching: Match each description with the most appropriate term (A- Firewall, B- VPN, C- DMZ):</div><ul class='match-list'><li><span>1) A technology that creates an encrypted virtual private line over the Internet.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>2) An area where servers exposed to the outside are placed separately from the internal network.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>3) A system that allows or denies communication based on rules set in advance.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li></ul></div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 2)</h1><div class="exercise-section"><div class='ex-q'>What is the term for the concept of layering multiple security measures?</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>What is the three-letter abbreviation for the technology that creates an encrypted virtual private line over the Internet?</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>EXAM-STYLE QUESTION: Explain why layering several security measures (defense in depth) protects an organization better than relying on a firewall alone. [6]</div><div class='long-box'>Write your detailed response here...</div></div><div class="exercise-section"><div class='ex-q'>A hospital moves its patient records to a cloud service and lets doctors access them from home. Using zero trust and defense in depth, suggest two measures it should apply.</div><div class='long-box'>Write your detailed response here...</div></div><div class="page-number"></div></div>
+        <div class="page-break" id="u2l2">
+            <h1>Lesson 3: Incident Response and Risk Management</h1>
+            <div class="hero-img">INCIDENT CONCEPT</div>
+
+            <div class="obj-box">
+                <h2>Learning Objectives</h2>
+                <ul>
+                    <li>Explain what a security incident is.</li><li>Describe the stages of incident response in the correct order.</li><li>Apply the idea of risk assessment by prioritizing risks.</li>
+                </ul>
+            </div>
+
+            <div class="warmup-box">
+                <h2>Warm-up Question</h2>
+                <p>When a security incident happens, how should an organization respond in order — and how does it decide which risks to address first?</p>
+            </div>
+            <div class="page-number"></div>
+        </div>
+        <div class="page-break"><h1>Explanation (Part 1)</h1><h3>What is a Security Incident?</h3><p>A situation in which actual damage occurs due to an information security problem. Examples: Information leak (personal data disclosed), Data tampering (data altered without authorization), and Service outage (service unavailable due to attacks).</p><h3>The 6 Stages of Incident Response</h3><ul><li>1. Preparation: Establish response procedures in advance.</li><li>2. Detection: Discover and confirm that an incident has occurred.</li><li>3. Containment: Limit the scope of impact so damage does not spread further.</li><li>4. Eradication: Remove the cause of the incident (e.g., remove malware).</li><li>5. Recovery: Return systems and services to their normal state.</li><li>6. Prevention of recurrence: Analyze the cause and document lessons learned.</li></ul><div class="page-number"></div></div><div class="page-break"><h1>Explanation (Part 2)</h1><h3>The Concept of Risk Assessment</h3><p>Risk is the possibility of an information security problem occurring. The size of a risk is determined by: Risk size = Impact × Likelihood.</p><p>Impact: how much damage occurs if the risk materializes. Likelihood: how high the probability is. High-impact and high-likelihood risks should be addressed first.</p><div class="diagram-box">[ Risk Evaluation Matrix Placeholder: High Impact + High Likelihood = Critical ]</div><div class="handwritten"><strong>Pause & Think:</strong><br>Why must containment come before eradication in the six-stage response?<br>Answer: Containment limits the impact so damage does not spread further. After containment, the team can safely remove the cause.</div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 1)</h1><div class="exercise-section"><div class='ex-q'>Multiple Choice: Choose the one that most appropriately describes the concept of risk assessment.</div><div class='mcq-opts'><div>&#9711; A- It is enough to address only risks with large impact.</div><div>&#9711; B- It is enough to address only risks with high likelihood.</div><div>&#9711; C- Risks with both high impact and high likelihood should be addressed first.</div><div>&#9711; D- All risks must be addressed simultaneously.</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: In incident response, it is important to first prevent the spread of damage before removing the cause.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: The size of a risk can be determined by impact alone.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: The final stage of incident response is prevention of recurrence.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>Matching: Indicate which stage of incident response (A- Preparation, B- Containment, C- Eradication, D- Prevention of recurrence) applies:</div><ul class='match-list'><li><span>1) Establishing response procedures in advance.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>2) Disconnecting a malware-infected computer from the network.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>3) Removing the malware infection.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>4) Analyzing the cause and taking measures to prevent recurrence.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li></ul></div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 2)</h1><div class="exercise-section"><div class='ex-q'>Name the six stages of incident response in order.</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>What are the two factors used to determine the size of a risk?</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>EXAM-STYLE QUESTION: Explain why the six stages of incident response must be carried out in order, using recovery and eradication as an example. [6]</div><div class='long-box'>Write your detailed response here...</div></div><div class="exercise-section"><div class='ex-q'>An online shop has just detected that customer data has been leaked. Name the next two stages it should carry out and why.</div><div class='long-box'>Write your detailed response here...</div></div><div class="page-number"></div></div>
+    <div class="page-break">
+        <h1>Unit 2 Summary & Reflection</h1>
+        <div class="obj-box">
+            <h2>Unit Overview</h2>
+            <p>You have completed Cybersecurity. Use this space to synthesize the core concepts from the lessons, map out critical vocabulary, and prepare for comprehensive assessments.</p>
+        </div>
+        <div class="long-box" style="height: 500px; padding: 20px;">
+           <p style="font-size: 16pt;">Personal Notes & Key Takeaways:</p>
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+        </div>
+        <div class="page-number"></div>
+    </div>
+
+    <div class="page-break unit-cover">
+        <h2>Unit 3</h2>
+        <h1>Web Applications</h1>
+        <p>Understanding the structure, communication methods, and frontend fundamentals of modern web applications.</p>
+        <div class="page-number"></div>
+    </div>
+
+        <div class="page-break" id="u3l0">
+            <h1>Lesson 1: The Overall Structure of Web Applications</h1>
+            <div class="hero-img">THE CONCEPT</div>
+
+            <div class="obj-box">
+                <h2>Learning Objectives</h2>
+                <ul>
+                    <li>Explain what a web application is.</li><li>Describe the roles of its three tiers: frontend, backend, and database.</li><li>Trace how the three tiers cooperate.</li>
+                </ul>
+            </div>
+
+            <div class="warmup-box">
+                <h2>Warm-up Question</h2>
+                <p>How is a web application structured, and how do its three tiers work together to respond to what a user does?</p>
+            </div>
+            <div class="page-number"></div>
+        </div>
+        <div class="page-break"><h1>Explanation (Part 1)</h1><h3>What is a Web Application?</h3><p>Web applications are applications used through a web browser. They can be used as long as you have a browser, without needing to install dedicated software (e.g., YouTube, Amazon, Gmail).</p><h3>The Three Tiers of a Web Application</h3><table><thead><tr><th>Tier</th><th>Role</th><th>Examples</th></tr></thead><tbody><tr><td>Frontend</td><td>The screen component that users see directly. Runs on the browser and accepts user input.</td><td>Search screen, product listing pages, input forms</td></tr><tr><td>Backend</td><td>The hidden server-side processing. Processes data and makes decisions.</td><td>Searching for products, login authentication</td></tr><tr><td>Database</td><td>A system that organizes, stores, and manages data.</td><td>Product information, user information, order history</td></tr></tbody></table><div class="page-number"></div></div><div class="page-break"><h1>Explanation (Part 2)</h1><h3>The Flow of How the Three Tiers Cooperate</h3><p>When a user operates a web application, the three tiers cooperate:
+1. Frontend receives input (search keywords).
+2. Frontend sends keywords to Backend.
+3. Backend searches the Database.
+4. Database returns matching data to Backend.
+5. Backend organizes results and returns to Frontend.
+6. Frontend displays the results on the user's screen.</p><h3>Familiar Configurations</h3><p>Video sharing site (Frontend: video player; Backend: selects recommendations; Database: stores video data). E-commerce site (Frontend: cart screen; Backend: stock checking; Database: order history).</p><div class="handwritten"><strong>Pause & Think:</strong><br>When you type in a search box and see results, which tier collected your input, and which tier found the answer?<br>Answer: Frontend collected the input; backend processed the request and found the answer in the database.</div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 1)</h1><div class="exercise-section"><div class='ex-q'>Multiple Choice: Choose the one that most appropriately describes the three-tier architecture of a web application.</div><div class='mcq-opts'><div>&#9711; A- The frontend has the role of storing and managing data.</div><div>&#9711; B- The backend is the part that users interact with directly on the browser.</div><div>&#9711; C- In response to user actions, the frontend, backend, and database cooperate to perform processing.</div><div>&#9711; D- The database has the role of displaying screens to users.</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: The frontend is the screen component that users see directly.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: The backend is the part that runs on the browser.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: A database is a system that organizes, stores, and manages data.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>Matching: Indicate which tier of an e-commerce site it belongs to (A- Frontend, B- Backend, C- Database):</div><ul class='match-list'><li><span>1) Product listing page display.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>2) Stock checking processing.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>3) Storage of customer information.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li></ul></div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 2)</h1><div class="exercise-section"><div class='ex-q'>What is the term for the screen component that users see directly?</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>What is the term for the part responsible for server-side processing that users do not see?</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>EXAM-STYLE QUESTION: Explain how the three tiers of a web application cooperate when a user posts a photo on a social media app. [6]</div><div class='long-box'>Write your detailed response here...</div></div><div class="exercise-section"><div class='ex-q'>A weather app lets users type a city and see the forecast. Using the three-tier model, name which tier does each job.</div><div class='long-box'>Write your detailed response here...</div></div><div class="page-number"></div></div>
+        <div class="page-break" id="u3l1">
+            <h1>Lesson 2: Web Application Communication Methods</h1>
+            <div class="hero-img">WEB CONCEPT</div>
+
+            <div class="obj-box">
+                <h2>Learning Objectives</h2>
+                <ul>
+                    <li>Explain the client and server model.</li><li>Describe how HTTP requests and responses work.</li><li>Explain the role of an API in exchanging data in JSON format.</li>
+                </ul>
+            </div>
+
+            <div class="warmup-box">
+                <h2>Warm-up Question</h2>
+                <p>How do the client and server communicate to make a web application work, and what rules and messages do they use?</p>
+            </div>
+            <div class="page-number"></div>
+        </div>
+        <div class="page-break"><h1>Explanation (Part 1)</h1><h3>Client and Server</h3><p>The Client is the side that requests data or processing from the server (e.g., web browsers, smartphone apps). The Server is the side that receives requests, processes them, and returns responses.</p><h3>HTTP and HTTPS</h3><p>HTTP (HyperText Transfer Protocol) is a protocol for exchanging data. HTTPS (HTTP Secure) adds TLS encryption, making communication content private and secure from eavesdropping.</p><h3>HTTP Requests and Responses</h3><p>Requests use HTTP methods: GET (retrieve data) and POST (send data for processing). Responses use Status Codes: 200 (Success), 404 (Page not found), and 500 (Server error).</p><div class="page-number"></div></div><div class="page-break"><h1>Explanation (Part 2)</h1><h3>API and JSON</h3><p>API (Application Programming Interface) is a system for exchanging data between different pieces of software. The frontend often sends requests to the backend through an API.</p><p>JSON (JavaScript Object Notation) is a data format that is easy for humans to read and for computers to process, often used in APIs.</p><div class="handwritten"><strong>Think as an Engineer:</strong><br>Decide between GET and POST for: 1) Loading a grade history -> GET. 2) Submitting a login form -> POST. The login should use HTTPS because it protects sensitive credentials during transmission.</div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 1)</h1><div class="exercise-section"><div class='ex-q'>Multiple Choice: Choose the combination of status code and meaning that is NOT appropriate.</div><div class='mcq-opts'><div>&#9711; A- 200 — The request was processed successfully</div><div>&#9711; B- 404 — Page not found</div><div>&#9711; C- 500 — The request was processed successfully</div><div>&#9711; D- 500 — A problem occurred on the server side</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: The client is the side that requests data, and the server returns the response.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: HTTPS is a communication protocol that adds encryption to HTTP.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: The GET method is for sending data to the server.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>Matching: Indicate which HTTP method is used (A- GET, B- POST):</div><ul class='match-list'><li><span>1) Displaying a web page.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>2) Entering an ID and password into a login form and submitting them.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>3) Displaying search results.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li></ul></div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 2)</h1><div class="exercise-section"><div class='ex-q'>What is the term for the system for exchanging data between different pieces of software?</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>What HTTP method is used for retrieving data from the server?</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>EXAM-STYLE QUESTION: Explain what happens, step by step, when a browser requests a web page and the server responds. [6]</div><div class='long-box'>Write your detailed response here...</div></div><div class="exercise-section"><div class='ex-q'>A weather service offers an API that returns today's forecast. Name which HTTP method the client would use to retrieve it, and why it should use HTTPS.</div><div class='long-box'>Write your detailed response here...</div></div><div class="page-number"></div></div>
+        <div class="page-break" id="u3l2">
+            <h1>Lesson 3: Fundamentals of Frontend Technology</h1>
+            <div class="hero-img">FUNDAMENTALS CONCEPT</div>
+
+            <div class="obj-box">
+                <h2>Learning Objectives</h2>
+                <ul>
+                    <li>Explain the distinct roles of HTML, CSS, and JavaScript.</li><li>Describe how semantic HTML improves a modern frontend.</li><li>Understand responsive design and frameworks.</li>
+                </ul>
+            </div>
+
+            <div class="warmup-box">
+                <h2>Warm-up Question</h2>
+                <p>How do HTML, CSS, and JavaScript work together to build a web page?</p>
+            </div>
+            <div class="page-number"></div>
+        </div>
+        <div class="page-break"><h1>Explanation (Part 1)</h1><h3>The Roles of HTML, CSS, and JavaScript</h3><table><thead><tr><th>Technology</th><th>Role</th><th>Analogy</th></tr></thead><tbody><tr><td>HTML</td><td>Defines the structure (skeleton) of a web page.</td><td>The frame of a building</td></tr><tr><td>CSS</td><td>Specifies the appearance (colors, layout, size, fonts).</td><td>The interior/exterior decoration</td></tr><tr><td>JavaScript</td><td>Adds behavior and interactivity (button responses, screen updates).</td><td>Electrical/plumbing systems</td></tr></tbody></table><h3>Semantic HTML</h3><p>Describing each part of a web page using tags that indicate their meaning (<header>, <nav>, <main>, <footer>). It improves Accessibility (screen readers understand structure) and SEO (Search Engine Optimization).</p><div class="page-number"></div></div><div class="page-break"><h1>Explanation (Part 2)</h1><h3>Responsive Design & Frameworks</h3><p>Responsive design automatically adjusts the layout according to different screen sizes (PCs, smartphones, tablets). Prioritizing small screens is known as the 'mobile first' concept.</p><p>A Framework is a structure that provides commonly used functions in advance for efficient development, so developers don't have to write code from scratch. Examples: React (Meta), Vue, Next.js.</p><div class="handwritten"><strong>Pause & Think:</strong><br>Why does a screen reader understand a page better when it uses semantic tags? <br>Answer: Semantic HTML explicitly indicates the meaning and role of each part of the page, guiding the screen reader properly.</div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 1)</h1><div class="exercise-section"><div class='ex-q'>Multiple Choice: Choose the one that most appropriately describes the reason responsive design is needed.</div><div class='mcq-opts'><div>&#9711; A- To improve the display speed of websites</div><div>&#9711; B- Because websites are accessed from various devices such as PCs, smartphones, and tablets</div><div>&#9711; C- To rise rankings in search engines</div><div>&#9711; D- To add behavior to web pages</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: HTML is a technology that defines the structure (skeleton) of a web page.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: CSS is a technology that adds behavior to a web page.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: Using a framework eliminates the need to write all code from scratch.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>Matching: Indicate which technology is used to achieve the task (A- HTML, B- CSS, C- JavaScript):</div><ul class='match-list'><li><span>1) Changing the color and size of text.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>2) Updating part of the screen when a button is pressed.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>3) Placing images and links.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>4) Validating the contents entered into a form.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li></ul></div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 2)</h1><div class="exercise-section"><div class='ex-q'>What is the four-letter abbreviation for the technology that defines the structure of a web page?</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>What is the term for the design concept in which the layout is automatically adjusted according to different screen sizes?</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>EXAM-STYLE QUESTION: Explain how HTML, CSS, and JavaScript each contribute to a library page that lists books, is styled, and filters the results as the user types. [6]</div><div class='long-box'>Write your detailed response here...</div></div><div class="exercise-section"><div class='ex-q'>A news site must look good on phones and be found easily by search engines. Name one responsive-design choice and one semantic-HTML choice it should make.</div><div class='long-box'>Write your detailed response here...</div></div><div class="page-number"></div></div>
+    <div class="page-break">
+        <h1>Unit 3 Summary & Reflection</h1>
+        <div class="obj-box">
+            <h2>Unit Overview</h2>
+            <p>You have completed Web Applications. Use this space to synthesize the core concepts from the lessons, map out critical vocabulary, and prepare for comprehensive assessments.</p>
+        </div>
+        <div class="long-box" style="height: 500px; padding: 20px;">
+           <p style="font-size: 16pt;">Personal Notes & Key Takeaways:</p>
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+        </div>
+        <div class="page-number"></div>
+    </div>
+
+    <div class="page-break unit-cover">
+        <h2>Unit 4</h2>
+        <h1>Web and Media Design</h1>
+        <p>Comparing media characteristics, mastering Information Design (UCD, Wireframes, CRAP), and utilizing evaluation and iterative improvement methods.</p>
+        <div class="page-number"></div>
+    </div>
+
+        <div class="page-break" id="u4l0">
+            <h1>Lesson 1: Types and Characteristics of Media</h1>
+            <div class="hero-img">TYPES CONCEPT</div>
+
+            <div class="obj-box">
+                <h2>Learning Objectives</h2>
+                <ul>
+                    <li>Compare the characteristics of different media.</li><li>Explain the strengths and constraints of websites.</li><li>Choose suitable media for a given purpose.</li>
+                </ul>
+            </div>
+
+            <div class="warmup-box">
+                <h2>Warm-up Question</h2>
+                <p>What are the strengths and constraints of different media, and how do you choose the right one for a purpose and audience?</p>
+            </div>
+            <div class="page-number"></div>
+        </div>
+        <div class="page-break"><h1>Explanation (Part 1)</h1><h3>Comparison of Media Characteristics</h3><p>TV reaches a large audience simultaneously (one-way). Radio appeals to hearing and can be used on the go. Newspapers remain physically printed and can be read offline. Websites combine text, images, video, and audio, allowing for two-way interaction. SNS spreads information rapidly and encourages user sharing.</p><h3>Strengths & Constraints of Websites</h3><ul><li>Strengths: Diverse information combined, updatable at any time, global access, two-way interaction (forms, comments).</li><li>Constraints: Normally requires an Internet connection, information doesn't reach users unless they actively seek it, variable loading speeds.</li></ul><div class="page-number"></div></div><div class="page-break"><h1>Explanation (Part 2)</h1><h3>Choosing Media According to Purpose</h3><p>To inform many people at once -> TV, SNS ads. To provide detailed information viewable anytime -> Website. To deliver directly -> Email. To spread by word of mouth -> SNS.</p><p>In practice, multiple media are used together. For instance, a TV commercial directs viewers to a website, which encourages sharing on SNS.</p><div class="handwritten"><strong>Pause & Think:</strong><br>Which medium would you choose to reach the most people at once — and which to let them respond to you?<br>Answer: TV reaches the most people at once. A Website or SNS allows users to interact and respond.</div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 1)</h1><div class="exercise-section"><div class='ex-q'>Multiple Choice: Choose the one that is NOT an appropriate characteristic of websites.</div><div class='mcq-opts'><div>&#9711; A- Information can be updated at any time.</div><div>&#9711; B- Information automatically reaches users without them actively accessing it.</div><div>&#9711; C- Text, images, and video can be combined.</div><div>&#9711; D- Two-way interaction is possible.</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: A website can present diverse information such as text, images, and video in combination.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: TV is a medium that allows two-way interaction with users.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: SNS is a medium highly effective at spreading information rapidly.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>Matching: Match each purpose with the most suitable medium (A- TV, B- Website, C- SNS):</div><ul class='match-list'><li><span>1) Make detailed information viewable at any time.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>2) Have users spread information by word of mouth.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>3) Inform many people at once with video.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li></ul></div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 2)</h1><div class="exercise-section"><div class='ex-q'>Name two distinct strengths of websites compared to traditional print media.</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>Name two constraints of websites.</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>EXAM-STYLE QUESTION: Explain why an organization might use a website, TV, and SNS together rather than only one, to promote a new service. [6]</div><div class='long-box'>Write your detailed response here...</div></div><div class="exercise-section"><div class='ex-q'>A hospital wants to inform patients about new opening hours and let them ask questions. Name one medium for reaching many people quickly and one that allows two-way interaction.</div><div class='long-box'>Write your detailed response here...</div></div><div class="page-number"></div></div>
+        <div class="page-break" id="u4l1">
+            <h1>Lesson 2: Information Design and User Experience</h1>
+            <div class="hero-img">INFORMATION CONCEPT</div>
+
+            <div class="obj-box">
+                <h2>Learning Objectives</h2>
+                <ul>
+                    <li>Explain how personas and wireframes are used to plan a website.</li><li>Apply the four principles of design (CRAP).</li><li>Explain the idea of user-centered design.</li>
+                </ul>
+            </div>
+
+            <div class="warmup-box">
+                <h2>Warm-up Question</h2>
+                <p>How do designers plan a website around its users, and what principles make a page clear and easy to use?</p>
+            </div>
+            <div class="page-number"></div>
+        </div>
+        <div class="page-break"><h1>Explanation (Part 1)</h1><h3>Persona and Wireframe</h3><p>A Persona is a representation of a typical user built around their goals, needs, behaviors, and context. It aligns decisions with the user's perspective. A Wireframe is a rough blueprint determining the placement and priority of information without colors or decorations. Doing this first stops arguments about aesthetic preferences.</p><h3>The Four Principles of Design (CRAP)</h3><ul><li>Contrast: Make priority clear and highlight important elements.</li><li>Repetition: Repeat specific characteristics for consistency.</li><li>Alignment: Align elements to a common baseline for visual order.</li><li>Proximity: Place related information close together (grouping).</li></ul><div class="page-number"></div></div><div class="page-break"><h1>Explanation (Part 2)</h1><h3>User-Centered Design (UCD)</h3><p>UCD is an approach that designs websites from the perspective of the user, rather than the convenience of the creator. The goal is to improve usability (ease of use) and accessibility (usable by people with varied needs or impairments).</p><div class="diagram-box">[ UX Design Process Placeholder: Persona -> Wireframe -> Visuals (CRAP) ]</div><div class="handwritten"><strong>Pause & Think:</strong><br>Why decide where information goes (wireframe) before choosing colors and fonts?<br>Answer: Because it finalizes logical priority before subjective arguments about visual preference can distract the stakeholders.</div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 1)</h1><div class="exercise-section"><div class='ex-q'>Multiple Choice: Choose the one that is NOT included in the four principles of design (CRAP principles).</div><div class='mcq-opts'><div>&#9711; A- Contrast</div><div>&#9711; B- Encryption</div><div>&#9711; C- Alignment</div><div>&#9711; D- Proximity</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: A persona is a typical user image set up as a concrete person.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: A wireframe is a final-version design that includes full color and decoration.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: Proximity means grouping related information close together.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>Matching: Match the design improvement to the principle (A- Contrast, B- Repetition, C- Alignment, D- Proximity):</div><ul class='match-list'><li><span>1) Making headings large and bold to distinguish them from body text.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>2) Grouping product names, prices, and photos close together.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>3) Standardizing the font and color of headings across all pages.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li></ul></div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 2)</h1><div class="exercise-section"><div class='ex-q'>What is the term for a blueprint that shows the placement and priority of information on a web page?</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>What is the term for the design approach that prioritizes the perspective of the user? (Give its abbreviation).</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>EXAM-STYLE QUESTION: Explain why a designer creates a persona and a wireframe before choosing colors and fonts. [6]</div><div class='long-box'>Write your detailed response here...</div></div><div class="exercise-section"><div class='ex-q'>A school wants to redesign its results page. Name the persona you would define, one wireframe decision, and one CRAP principle you would apply.</div><div class='long-box'>Write your detailed response here...</div></div><div class="page-number"></div></div>
+        <div class="page-break" id="u4l2">
+            <h1>Lesson 3: Methods for Evaluating Websites</h1>
+            <div class="hero-img">METHODS CONCEPT</div>
+
+            <div class="obj-box">
+                <h2>Learning Objectives</h2>
+                <ul>
+                    <li>Distinguish qualitative from quantitative evaluation.</li><li>Explain the major indicators used in web analytics.</li><li>Explain how heuristic evaluation works.</li>
+                </ul>
+            </div>
+
+            <div class="warmup-box">
+                <h2>Warm-up Question</h2>
+                <p>How can a website be evaluated, and why is it useful to combine numbers with users' voices?</p>
+            </div>
+            <div class="page-number"></div>
+        </div>
+        <div class="page-break"><h1>Explanation (Part 1)</h1><h3>Qualitative vs. Quantitative Evaluation</h3><p>Qualitative evaluation explores the 'reasons' behind user behavior through observation, interviews, and usability testing. It answers 'why'. Quantitative evaluation uses numerical data to objectively measure behavior and results. It answers 'how much'.</p><h3>Major Indicators in Web Analytics</h3><table><thead><tr><th>Indicator</th><th>Description</th></tr></thead><tbody><tr><td>PV (Page View)</td><td>Total number of times a page has been viewed.</td></tr><tr><td>Bounce Rate</td><td>Proportion of visits that ended after viewing only the first page.</td></tr><tr><td>CVR (Conversion Rate)</td><td>Proportion of visits that achieved a target action (purchase, registration).</td></tr></tbody></table><div class="page-number"></div></div><div class="page-break"><h1>Explanation (Part 2)</h1><h3>Heuristic Evaluation</h3><p>A qualitative method in which experts identify UI problems based on rules of thumb (heuristics). Examples: Consistency across the site, Error prevention, and Visibility of system status (e.g., loading indicators, error messages).</p><div class="handwritten"><strong>Pause & Think:</strong><br>Would counting visits tell you why people leave a page? Which method would?<br>Answer: No, counting visits is quantitative. Qualitative methods (like usability tests) show the reasons why people leave.</div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 1)</h1><div class="exercise-section"><div class='ex-q'>Multiple Choice: Choose the one that most appropriately describes the conversion rate (CVR).</div><div class='mcq-opts'><div>&#9711; A- The proportion of times a page has been viewed</div><div>&#9711; B- The proportion of visits that ended after viewing only the first page</div><div>&#9711; C- The proportion of visits that achieved a target action</div><div>&#9711; D- The proportion of viewed pages relative to total pages</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: Qualitative evaluation uses numerical data to evaluate quantitatively.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: PV (Page View) is an indicator showing the number of times a page has been viewed.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: Heuristic evaluation is a method in which experts identify UI problems based on rules of thumb.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>Matching: Match each description with the indicator (A- PV, B- Bounce rate, C- Conversion rate):</div><ul class='match-list'><li><span>1) The number of times a page has been viewed.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>2) The proportion of visits that ended after viewing only the first page.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>3) The proportion of visits that achieved a target action.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li></ul></div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 2)</h1><div class="exercise-section"><div class='ex-q'>What is the term for the method that evaluates qualitatively by observing user voices and behavior?</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>What is the term for the method in which experts identify UI problems based on rules of thumb?</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>EXAM-STYLE QUESTION: Explain why a website team should use both qualitative and quantitative evaluation rather than only one. [6]</div><div class='long-box'>Write your detailed response here...</div></div><div class="exercise-section"><div class='ex-q'>A school's new website gets many visits, but most people leave after the first page. Name one quantitative indicator that reveals this and one qualitative method to find the cause.</div><div class='long-box'>Write your detailed response here...</div></div><div class="page-number"></div></div>
+        <div class="page-break" id="u4l3">
+            <h1>Lesson 4: The Iterative Improvement Process</h1>
+            <div class="hero-img">THE CONCEPT</div>
+
+            <div class="obj-box">
+                <h2>Learning Objectives</h2>
+                <ul>
+                    <li>Explain the PDCA cycle and steps of design thinking.</li><li>Describe how A/B testing compares two options.</li><li>Explain why improvement is repeated in cycles.</li>
+                </ul>
+            </div>
+
+            <div class="warmup-box">
+                <h2>Warm-up Question</h2>
+                <p>Why is improving a website a repeated loop rather than a one-time job, and how do teams decide what to change?</p>
+            </div>
+            <div class="page-number"></div>
+        </div>
+        <div class="page-break"><h1>Explanation (Part 1)</h1><h3>The PDCA Cycle</h3><p>A method that continuously advances improvement through four steps: Plan (set goals), Do (execute), Check (measure results), Act (decide next steps). Gradual improvement through repetition.</p><h3>Design Thinking</h3><ul><li>1. Empathize: Understand user challenges.</li><li>2. Define: Clarify the problem.</li><li>3. Ideate: Generate many ideas.</li><li>4. Prototype: Quickly create a testable model.</li><li>5. Test: Have users try it and gather feedback.</li></ul><div class="page-number"></div></div><div class="page-break"><h1>Explanation (Part 2)</h1><h3>A/B Testing</h3><p>A method where two patterns (A and B) are shown to actual users to see which is more effective. Crucially, change only ONE element at a time, so you know what caused the difference. Make decisions only after collecting enough data.</p><div class="diagram-box">[ A/B Testing Concept Placeholder: Version A vs Version B -> Analytics ]</div><div class="handwritten"><strong>Pause & Think:</strong><br>In A/B testing, why change only one element at a time?<br>Answer: If you change multiple elements, you won't know which specific change caused the improvement or decline in the metric.</div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 1)</h1><div class="exercise-section"><div class='ex-q'>Multiple Choice: Choose the one that corresponds to 'Check' in the PDCA cycle.</div><div class='mcq-opts'><div>&#9711; A- Set the goal of reducing the bounce rate.</div><div>&#9711; B- Change the design of the homepage.</div><div>&#9711; C- Measure the bounce rate after the change.</div><div>&#9711; D- Consider another improvement measure.</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: The PDCA cycle repeats the four steps Plan, Do, Check, Act.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: In A/B testing, it is important to change only one element at a time.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>True / False: The PDCA cycle is a method that is permanently complete after one execution.</div><div class='tf-box'><div>&#9711; True</div><div>&#9711; False</div></div></div><div class="exercise-section"><div class='ex-q'>Matching: Indicate which step of Design Thinking it corresponds to (A- Empathize, B- Define, C- Ideate, D- Prototype, E- Test):</div><ul class='match-list'><li><span>1) Understand the user's challenges and needs.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>2) Quickly create a testable model.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li><li><span>3) Have users try the model and observe.</span> <span>[&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;]</span></li></ul></div><div class="page-number"></div></div><div class="page-break"><h1>Practice (Part 2)</h1><div class="exercise-section"><div class='ex-q'>What is the term for the improvement method that repeats Plan, Do, Check, Act?</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>What is the term for the method in which two patterns are prepared and compared with real data to see which is more effective?</div><div class='short-box'></div></div><div class="exercise-section"><div class='ex-q'>EXAM-STYLE QUESTION: Explain why a website team improves in repeated PDCA cycles instead of trying to build a perfect site in one go. [6]</div><div class='long-box'>Write your detailed response here...</div></div><div class="exercise-section"><div class='ex-q'>You may run only one A/B test this month on an event page. Choose the single element to test, predict which option will win, and say what metric would prove you right.</div><div class='long-box'>Write your detailed response here...</div></div><div class="page-number"></div></div>
+    <div class="page-break">
+        <h1>Unit 4 Summary & Reflection</h1>
+        <div class="obj-box">
+            <h2>Unit Overview</h2>
+            <p>You have completed Web and Media Design. Use this space to synthesize the core concepts from the lessons, map out critical vocabulary, and prepare for comprehensive assessments.</p>
+        </div>
+        <div class="long-box" style="height: 500px; padding: 20px;">
+           <p style="font-size: 16pt;">Personal Notes & Key Takeaways:</p>
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+           <hr style="border-top: 1px dashed #cbd5e1; margin-top: 30px;">
+        </div>
+        <div class="page-number"></div>
+    </div>
+
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+<script>
+    window.onscroll = function() {
+        var winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+        var height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+        var scrolled = (winScroll / height) * 100;
+        document.getElementById("myBar").style.width = scrolled + "%";
+    };
+
+    function saveToPDF() {
+        confetti({ particleCount: 150, spread: 80, origin: { y: 0.8 }, colors: ['#246b7a', '#f4c118', '#e67e22'] });
+        setTimeout(() => { window.print(); }, 1500);
+    }
+
+   /*  const bots = ['🤖', '🚀', '💻', '💡', '👾', '⚡', '👨‍💻'];
+    const messages = [
+        "Don't give up, code works by magic sometimes! ✨",
+        "I'm watching you study... Keep going! 👀",
+        "Error 404: Boredom not found! 🚀",
+        "Have you tried turning it off and on again? 🔌",
+        "AI is smart, but YOU are the boss! 👑",
+        "Loading more brain power... 100%",
+        "Code, Create, Innovate!"
+    ]; */
+
+    for(let i=0; i<5; i++) {
+        let bot = document.createElement('div');
+        bot.className = 'floating-bot';
+        bot.innerText = bots[Math.floor(Math.random() * bots.length)];
+
+        let tooltip = document.createElement('div');
+        tooltip.className = 'bot-msg';
+        tooltip.innerText = messages[Math.floor(Math.random() * messages.length)];
+        bot.appendChild(tooltip);
+
+        bot.style.top = (Math.random() * 80 + 10) + 'vh';
+        bot.style.left = (Math.random() * 90 + 5) + 'vw';
+        bot.style.animationDelay = (Math.random() * 5) + 's';
+        bot.style.animationDuration = (Math.random() * 10 + 15) + 's';
+
+        document.body.appendChild(bot);
+    }
+</script>
+</body></html>
